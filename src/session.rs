@@ -12,7 +12,7 @@ use std::{
 
 use byte_string::ByteStr;
 use kcp::KcpResult;
-use log::{error, trace};
+use log::{error, trace, warn};
 use spin::Mutex as SpinMutex;
 use tokio::{
     net::UdpSocket,
@@ -81,6 +81,7 @@ impl KcpSession {
         let (input_tx, mut input_rx) = mpsc::channel(64);
 
         let udp_socket = socket.udp_socket().clone();
+        let target_addr = socket.target_addr();
 
         let session = Arc::new(KcpSession::new(
             socket,
@@ -98,16 +99,20 @@ impl KcpSession {
                     tokio::select! {
                         // recv() then input()
                         // Drives the KCP machine forward
-                        recv_result = udp_socket.recv(&mut input_buffer), if is_client => {
+                        recv_result = udp_socket.recv_from(&mut input_buffer), if is_client => {
                             match recv_result {
                                 Err(err) => {
                                     error!("[SESSION] UDP recv failed, error: {}", err);
                                     session.closed.store(true, Ordering::Release);
                                     break;
                                 }
-                                Ok(n) => {
-                                    let input_buffer = &input_buffer[..n];
+                                Ok((n, addr)) => {
+                                    if addr != target_addr {
+                                        warn!("[SESSION] UDP recv addr {:?} is not {:?}", addr, target_addr);
+                                        continue;
+                                    }
 
+                                    let input_buffer = &input_buffer[..n];
                                     if input_buffer.len() < kcp::KCP_OVERHEAD {
                                         error!("packet too short, received {} bytes, but at least {} bytes",
                                                input_buffer.len(),
