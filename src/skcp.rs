@@ -78,7 +78,6 @@ pub struct KcpSocket {
     pending_receiver: Option<Waker>,
     closed: bool,
     allow_recv_empty_packet: bool,
-    target_addr: SocketAddr,
 }
 
 impl KcpSocket {
@@ -115,7 +114,6 @@ impl KcpSocket {
             pending_receiver: None,
             closed: false,
             allow_recv_empty_packet: c.allow_recv_empty_packet,
-            target_addr,
         })
     }
 
@@ -301,10 +299,6 @@ impl KcpSocket {
 
     pub fn udp_socket(&self) -> &Arc<UdpSocket> {
         &self.socket
-    }
-
-    pub fn target_addr(&self) -> SocketAddr {
-        self.target_addr
     }
 
     pub fn can_close(&self) -> bool {
